@@ -74,8 +74,8 @@ Offset  Size  Description
 | Value | Type Name | Description |
 |-------|-----------|-------------|
 | 0     | Unknown   | Unknown or unspecified file type |
-| 1     | amiibo v2 | Amiibo v2 format (most amiibos since the beginning) |
-| 2     | amiibo v3 | Amiibo v3 format (I2C 2K Plus) |
+| 1     | Amiibo v2 | Amiibo v2 format (most amiibos since the beginning) |
+| 2     | Amiibo v3 | Amiibo v3 format (I2C 2K Plus, e.g. Kirby Air Riders) |
 | 3     | Skylander | Skylander dumps |
 | 4     | Destiny Infinity | Destiny Infinity dumps |
 | 5     | Lego Dimensions | Lego Dimensions dumps |
