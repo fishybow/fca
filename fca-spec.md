@@ -65,37 +65,38 @@ Offset  Size  Description
 0       1     File type (unsigned byte, 0-255)
               Indicates the type of the embedded file.
               File types will be defined in a future revision.
-1       1     Reserved (unsigned byte)
-              Reserved for future use. Must be set to 0x00.
+1       1     Purpose (unsigned byte, 0-255)
+              Indicates the purpose or usage of the embedded file.
+              Purpose values will be defined in a future revision.
 ```
 
 **Current Implementation:**
-- Both bytes are currently set to `0x00` (file type = 0, reserved = 0)
-- File type definitions will be added in a future revision
+- Both bytes are currently set to `0x00` (file type = 0, purpose = 0)
+- File type and purpose definitions will be added in a future revision
 
 ## File Layout Diagram
 
 ```
 ┌─────────────────────────────────────────┐
 │ Global Header                           │
-│ ┌─────────┬──────────┐                 │
-│ │ "FCA"   │ Version  │                 │
-│ │ (3 B)   │ (1 B)    │                 │
-│ └─────────┴──────────┘                 │
+│ ┌─────────┬──────────┐                  │
+│ │ "FCA"   │ Version  │                  │
+│ │ (3 B)   │ (1 B)    │                  │
+│ └─────────┴──────────┘                  │
 ├─────────────────────────────────────────┤
 │ Embedded File 1                         │
-│ ┌──────┬──────┬────────┬──────────────┐│
-│ │ Total│Header│ Header │ Embedded     ││
-│ │ Size │ Size │ Bytes  │ File Bytes   ││
-│ │ (4 B)│ (2 B)│ (H B)  │ (E B)        ││
-│ └──────┴──────┴────────┴──────────────┘│
+│ ┌──────┬──────┬────────┬──────────────┐ │
+│ │ Total│Header│ Header │ Embedded     │ │
+│ │ Size │ Size │ Bytes  │ File Bytes   │ │
+│ │ (4 B)│ (2 B)│ (H B)  │ (E B)        │ │
+│ └──────┴──────┴────────┴──────────────┘ │
 ├─────────────────────────────────────────┤
 │ Embedded File 2                         │
-│ ┌──────┬──────┬────────┬──────────────┐│
-│ │ Total│Header│ Header │ Embedded     ││
-│ │ Size │ Size │ Bytes  │ File Bytes   ││
-│ │ (4 B)│ (2 B)│ (H B)  │ (E B)        ││
-│ └──────┴────────┴────────┴──────────────┘│
+│ ┌──────┬──────┬────────┬──────────────┐ │
+│ │ Total│Header│ Header │ Embedded     │ │
+│ │ Size │ Size │ Bytes  │ File Bytes   │ │
+│ │ (4 B)│ (2 B)│ (H B)  │ (E B)        │ │
+│ └──────┴────────┴────────┴─────────────┘│
 ├─────────────────────────────────────────┤
 │ ... (more embedded files)               │
 └─────────────────────────────────────────┘
@@ -106,7 +107,7 @@ Offset  Size  Description
 For a file containing one embedded file with:
 - Version: 1
 - Header size: 2 bytes
-- Header: `[0x00, 0x00]` (file type = 0, reserved = 0)
+- Header: `[0x00, 0x00]` (file type = 0, purpose = 0)
 - Embedded file: `[0xAA, 0xBB, 0xCC]` (3 bytes)
 
 The file structure would be:
@@ -115,7 +116,7 @@ Bytes 0-2:   "FCA" (0x46, 0x43, 0x41)
 Byte 3:      0x01 (version 1)
 Bytes 4-7:   0x00000007 (total size = 2 + 2 + 3 = 7, big-endian)
 Bytes 8-9:   0x0002 (header size = 2, big-endian)
-Bytes 10-11: [0x00, 0x00] (header: file type = 0, reserved = 0)
+Bytes 10-11: [0x00, 0x00] (header: file type = 0, purpose = 0)
 Bytes 12-14: [0xAA, 0xBB, 0xCC] (embedded file)
 ```
 
@@ -132,3 +133,4 @@ Bytes 12-14: [0xAA, 0xBB, 0xCC] (embedded file)
 | Date       | Version | Description |
 |------------|---------|-------------|
 | 2026-02-12 | 1.0     | Initial specification. Defined basic FCA format structure with global header and embedded file format. |
+| 2026-02-12 | 1.1     | Added version 1 header format: 2-byte header with file type (byte 0) and purpose (byte 1). Both bytes currently set to 0x00. |

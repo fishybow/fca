@@ -62,14 +62,12 @@ def decode_fca(input_file, output_dir):
                 if len(header_bytes) < header_size:
                     raise ValueError(f"Unexpected EOF while reading header for embedded file {file_count + 1}")
                 
-                # For version 1, header is 2 bytes: file_type (byte 0) and reserved (byte 1)
+                # For version 1, header is 2 bytes: file_type (byte 0) and purpose (byte 1)
                 # Currently not used, but read for future compatibility
                 if version == 1 and header_size == 2:
                     file_type = header_bytes[0]
-                    reserved = header_bytes[1]
-                    # Reserved byte must be 0x00
-                    if reserved != 0x00:
-                        print(f"Warning: Reserved byte is not 0x00 in embedded file {file_count + 1}")
+                    purpose = header_bytes[1]
+                    # Both bytes currently default to 0x00
             
             # Calculate embedded file size
             embedded_size = total_size - 2 - header_size

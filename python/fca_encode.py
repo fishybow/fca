@@ -53,7 +53,7 @@ def encode_fca(input_dir, output_file):
                 content = file_content.read()
             
             # Calculate sizes
-            header_size = 2  # Version 1 header: 2 bytes (file type + reserved)
+            header_size = 2  # Version 1 header: 2 bytes (file type + purpose)
             embedded_size = len(content)
             total_size = 2 + header_size + embedded_size  # 2 bytes for header_size field
             
@@ -65,7 +65,7 @@ def encode_fca(input_dir, output_file):
             
             # Write header bytes (version 1 format)
             # Byte 0: File type (currently 0x00, to be defined later)
-            # Byte 1: Reserved (must be 0x00)
+            # Byte 1: Purpose (currently 0x00, to be defined later)
             f.write(struct.pack('>BB', 0x00, 0x00))
             
             # Write embedded file content

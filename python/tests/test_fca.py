@@ -66,7 +66,7 @@ class TestFCAEncode:
             header_bytes = f.read(header_size)
             assert len(header_bytes) == 2
             assert header_bytes[0] == 0x00  # File type (currently 0)
-            assert header_bytes[1] == 0x00  # Reserved (must be 0)
+            assert header_bytes[1] == 0x00  # Purpose (currently 0)
             
             # Read content
             content = f.read(total_size - 2 - header_size)
@@ -424,7 +424,7 @@ class TestFCAFormat:
             header_bytes = f.read(header_size)
             assert len(header_bytes) == 2
             assert header_bytes[0] == 0x00  # File type
-            assert header_bytes[1] == 0x00  # Reserved
+            assert header_bytes[1] == 0x00  # Purpose
             
             # Verify total_size calculation
             embedded_size = total_size - 2 - header_size

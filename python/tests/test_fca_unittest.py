@@ -62,7 +62,7 @@ class TestFCAEncode(unittest.TestCase):
             header_bytes = f.read(header_size)
             self.assertEqual(len(header_bytes), 2)
             self.assertEqual(header_bytes[0], 0x00)  # File type (currently 0)
-            self.assertEqual(header_bytes[1], 0x00)  # Reserved (must be 0)
+            self.assertEqual(header_bytes[1], 0x00)  # Purpose (currently 0)
             
             # Read content
             content = f.read(total_size - 2 - header_size)
