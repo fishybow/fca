@@ -350,6 +350,25 @@ class TestFCARoundTrip(unittest.TestCase):
         self.assertTrue(extracted_file.exists(), f"File with MD5 {expected_md5} not found")
         with open(extracted_file, 'rb') as f:
             self.assertEqual(f.read(), original_content)
+    
+    def test_round_trip_amiibo_files(self):
+        """Test round-trip with amiibo binary fixtures (test-amiibo-v2, test-amiibo-v3)."""
+        amiibo_dir = Path(self.temp_dir) / 'amiibo'
+        amiibo_dir.mkdir()
+        for name in ('test-amiibo-v2.bin', 'test-amiibo-v3.bin'):
+            shutil.copy(self.test_data_dir / name, amiibo_dir / name)
+        fca_file = Path(self.temp_dir) / 'test.fca'
+        encode_fca(str(amiibo_dir), str(fca_file))
+        output_dir = Path(self.temp_dir) / 'output'
+        decode_fca(str(fca_file), str(output_dir))
+        for name in ('test-amiibo-v2.bin', 'test-amiibo-v3.bin'):
+            with open(self.test_data_dir / name, 'rb') as f:
+                original_content = f.read()
+            expected_md5 = hashlib.md5(original_content).hexdigest()
+            extracted_file = output_dir / expected_md5
+            self.assertTrue(extracted_file.exists(), f"File {name} (MD5 {expected_md5}) not found")
+            with open(extracted_file, 'rb') as f:
+                self.assertEqual(f.read(), original_content)
 
 
 if __name__ == '__main__':
