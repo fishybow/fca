@@ -14,8 +14,9 @@ import sys
 
 # Add parent directory to path to import fca_encode and fca_decode
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from fca_encode import encode_fca
+from fca_encode import encode_fca, detect_file_type
 from fca_decode import decode_fca
+from constants import FILE_TYPE_AMIIBO_V2, FILE_TYPE_AMIIBO_V3
 
 
 @pytest.fixture
@@ -472,6 +473,60 @@ class TestFCAFormat:
             little_endian_value = struct.unpack('<I', total_size_bytes)[0]
             if total_size > 255:
                 assert total_size != little_endian_value
+    
+    def test_embedded_file_types_match_detection(self, temp_dir, test_data_dir):
+        """Verify each embedded file's type byte matches encoder detection."""
+        output_file = Path(temp_dir) / 'output.fca'
+        encode_fca(str(test_data_dir), str(output_file))
+        with open(output_file, 'rb') as f:
+            assert f.read(3) == b'FCA'
+            version = struct.unpack('>B', f.read(1))[0]
+            assert version == 1
+            index = 0
+            while True:
+                total_size_bytes = f.read(4)
+                if len(total_size_bytes) < 4:
+                    break
+                total_size = struct.unpack('>I', total_size_bytes)[0]
+                header_size = struct.unpack('>H', f.read(2))[0]
+                header_bytes = f.read(header_size)
+                embedded_size = total_size - 2 - header_size
+                content = f.read(embedded_size)
+                file_type = header_bytes[0]
+                reserved = header_bytes[1]
+                assert reserved == 0x00, f"Embedded file {index + 1}: reserved byte must be 0"
+                expected_type = detect_file_type(content)
+                assert file_type == expected_type, (
+                    f"Embedded file {index + 1}: stored type {file_type} != detected type {expected_type}"
+                )
+                index += 1
+            assert index > 0, "Expected at least one embedded file"
+    
+    def test_amiibo_fixtures_have_correct_types(self, temp_dir, test_data_dir):
+        """Verify test-amiibo-v2.bin and test-amiibo-v3.bin get types 1 and 2."""
+        amiibo_dir = Path(temp_dir) / 'amiibo'
+        amiibo_dir.mkdir()
+        shutil.copy(test_data_dir / 'test-amiibo-v2.bin', amiibo_dir / 'test-amiibo-v2.bin')
+        shutil.copy(test_data_dir / 'test-amiibo-v3.bin', amiibo_dir / 'test-amiibo-v3.bin')
+        output_file = Path(temp_dir) / 'output.fca'
+        encode_fca(str(amiibo_dir), str(output_file))
+        with open(output_file, 'rb') as f:
+            assert f.read(3) == b'FCA'
+            assert struct.unpack('>B', f.read(1))[0] == 1
+            # First embedded file (v2)
+            total_size = struct.unpack('>I', f.read(4))[0]
+            header_size = struct.unpack('>H', f.read(2))[0]
+            header_bytes = f.read(header_size)
+            f.read(total_size - 2 - header_size)
+            assert header_bytes[0] == FILE_TYPE_AMIIBO_V2, "test-amiibo-v2.bin should have type Amiibo v2 (1)"
+            assert header_bytes[1] == 0x00
+            # Second embedded file (v3)
+            total_size = struct.unpack('>I', f.read(4))[0]
+            header_size = struct.unpack('>H', f.read(2))[0]
+            header_bytes = f.read(header_size)
+            f.read(total_size - 2 - header_size)
+            assert header_bytes[0] == FILE_TYPE_AMIIBO_V3, "test-amiibo-v3.bin should have type Amiibo v3 (2)"
+            assert header_bytes[1] == 0x00
 
 
 if __name__ == '__main__':
