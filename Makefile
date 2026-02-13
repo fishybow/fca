@@ -13,6 +13,8 @@ help: ## Show this help message
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
+t: test-both
+
 test: test-unittest ## Run all tests (defaults to unittest)
 
 test-unittest: ## Run tests using unittest (standard library)
@@ -21,7 +23,7 @@ test-unittest: ## Run tests using unittest (standard library)
 
 test-pytest: ## Run tests using pytest (requires pytest)
 	@echo "Running pytest tests..."
-	cd python && $(PYTHON) -m pytest tests/test_fca.py -v
+	cd python && $(PYTHON) -m pytest tests/test_fca_pytest.py -v
 
 test-both: test-unittest test-pytest ## Run both unittest and pytest tests
 
@@ -36,5 +38,5 @@ clean: ## Clean test artifacts and cache files
 check: ## Check code syntax
 	@echo "Checking Python syntax..."
 	cd python && $(PYTHON) -m py_compile fca_encode.py fca_decode.py
-	cd python && $(PYTHON) -m py_compile tests/test_fca.py tests/test_fca_unittest.py
+	cd python && $(PYTHON) -m py_compile tests/test_fca_pytest.py tests/test_fca_unittest.py
 	@echo "Syntax check passed."

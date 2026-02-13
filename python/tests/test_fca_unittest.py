@@ -160,6 +160,42 @@ class TestFCAEncode(unittest.TestCase):
         with self.assertRaises(ValueError):
             encode_fca([str(output_file)], str(output_file))
 
+    def test_encode_exclude_pattern(self):
+        """Test that exclude_pattern excludes files whose relative path contains the string."""
+        src_dir = Path(self.temp_dir) / 'src'
+        src_dir.mkdir()
+        (src_dir / 'subdir').mkdir()
+        shutil.copy(self.test_data_dir / 'file1.txt', src_dir / 'top.txt')
+        shutil.copy(self.test_data_dir / 'file2.bin', src_dir / 'subdir' / 'nested.bin')
+
+        output_file = Path(self.temp_dir) / 'output.fca'
+        encode_fca([str(src_dir)], str(output_file), exclude_pattern='subdir')
+
+        self.assertTrue(output_file.exists())
+        with open(output_file, 'rb') as f:
+            f.read(4)  # magic + version
+            count = 0
+            while True:
+                total_size_bytes = f.read(4)
+                if len(total_size_bytes) < 4:
+                    break
+                total_size = struct.unpack('>I', total_size_bytes)[0]
+                header_size = struct.unpack('>H', f.read(2))[0]
+                f.read(header_size)
+                embedded_size = total_size - 2 - header_size
+                f.read(embedded_size)
+                count += 1
+        self.assertEqual(count, 1)
+        with open(output_file, 'rb') as f:
+            f.read(4)
+            total_size = struct.unpack('>I', f.read(4))[0]
+            header_size = struct.unpack('>H', f.read(2))[0]
+            f.read(header_size)
+            content = f.read(total_size - 2 - header_size)
+        with open(self.test_data_dir / 'file1.txt', 'rb') as f:
+            expected = f.read()
+        self.assertEqual(content, expected)
+
 
 class TestFCADecode(unittest.TestCase):
     """Tests for FCA decoding."""
