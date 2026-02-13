@@ -3,7 +3,7 @@
 FCA Encoder - Creates FCA archives from directory contents.
 
 Usage:
-    python fca_encode.py <input_directory> <output_file>
+    python fca_encode.py --output-file <file> --input-dirs <dir1> [<dir2> ...]
 """
 
 import argparse
@@ -62,33 +62,33 @@ def detect_file_type(content):
     
     return FILE_TYPE_UNKNOWN
 
-def encode_fca(input_dir, output_file):
+def encode_fca(input_dirs, output_file):
     """
-    Recursively concatenate all files in input_dir into an FCA archive.
+    Recursively concatenate all files from input_dirs into an FCA archive.
     
     Args:
-        input_dir: Path to input directory
+        input_dirs: Paths to input directories
         output_file: Path to output FCA file
     """
-    input_path = Path(input_dir)
     output_path = Path(output_file)
-    
-    if not input_path.is_dir():
-        raise ValueError(f"Input path is not a directory: {input_dir}")
     
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Collect all files recursively (skip hidden files and directories)
+    # Collect all files recursively from each input dir (skip hidden files and directories)
     files = []
-    for root, dirs, filenames in os.walk(input_path):
-        # Don't descend into hidden directories
-        dirs[:] = [d for d in dirs if not d.startswith('.')]
-        for filename in filenames:
-            if filename.startswith('.'):
-                continue
-            file_path = Path(root) / filename
-            files.append(file_path)
+    for input_dir in input_dirs:
+        input_path = Path(input_dir)
+        if not input_path.is_dir():
+            raise ValueError(f"Input path is not a directory: {input_dir}")
+        for root, dirs, filenames in os.walk(input_path):
+            # Don't descend into hidden directories
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for filename in filenames:
+                if filename.startswith('.'):
+                    continue
+                file_path = Path(root) / filename
+                files.append(file_path)
     
     # Sort files for consistent output
     files.sort()
@@ -134,21 +134,26 @@ def encode_fca(input_dir, output_file):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Encode files from a directory into an FCA archive'
+        description='Encode files from directories into an FCA archive'
     )
     parser.add_argument(
-        'input_dir',
-        help='Input directory containing files to archive'
-    )
-    parser.add_argument(
-        'output_file',
+        '--output-file',
+        required=True,
+        metavar='<file>',
         help='Output FCA file path'
+    )
+    parser.add_argument(
+        '--input-dirs',
+        required=True,
+        nargs='+',
+        metavar='<dir>',
+        help='Input directory(ies) containing files to archive'
     )
     
     args = parser.parse_args()
     
     try:
-        encode_fca(args.input_dir, args.output_file)
+        encode_fca(args.input_dirs, args.output_file)
     except Exception as e:
         print(f"Error: {e}", file=os.sys.stderr)
         os.sys.exit(1)

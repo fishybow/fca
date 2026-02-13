@@ -3,7 +3,7 @@
 FCA Decoder - Extracts embedded files from FCA archives.
 
 Usage:
-    python fca_decode.py <input_file> <output_directory>
+    python fca_decode.py --input-file <file> --output-dir <dir>
 """
 
 import argparse
@@ -126,11 +126,15 @@ def main():
         description='Decode an FCA archive and extract embedded files'
     )
     parser.add_argument(
-        'input_file',
+        '--input-file',
+        required=True,
+        metavar='<file>',
         help='Input FCA file path'
     )
     parser.add_argument(
-        'output_dir',
+        '--output-dir',
+        required=True,
+        metavar='<dir>',
         help='Output directory for extracted files'
     )
     

@@ -44,7 +44,7 @@ class TestFCAEncode:
         shutil.copy(test_data_dir / 'file1.txt', single_file_dir / 'file1.txt')
         
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(single_file_dir), str(output_file))
+        encode_fca([str(single_file_dir)], str(output_file))
         
         assert output_file.exists()
         
@@ -82,7 +82,7 @@ class TestFCAEncode:
     def test_encode_multiple_files(self, temp_dir, test_data_dir):
         """Test encoding multiple files from a directory."""
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(test_data_dir), str(output_file))
+        encode_fca([str(test_data_dir)], str(output_file))
         
         assert output_file.exists()
         
@@ -127,7 +127,7 @@ class TestFCAEncode:
         shutil.copy(test_data_dir / 'empty.txt', empty_file_dir / 'empty.txt')
         
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(empty_file_dir), str(output_file))
+        encode_fca([str(empty_file_dir)], str(output_file))
         
         assert output_file.exists()
         
@@ -157,7 +157,7 @@ class TestFCAEncode:
     def test_encode_nested_directories(self, temp_dir, test_data_dir):
         """Test encoding files from nested directories."""
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(test_data_dir), str(output_file))
+        encode_fca([str(test_data_dir)], str(output_file))
         
         assert output_file.exists()
         
@@ -190,7 +190,7 @@ class TestFCAEncode:
         output_file = Path(temp_dir) / 'output.fca'
         
         with pytest.raises(ValueError, match="Input path is not a directory"):
-            encode_fca(str(output_file), str(output_file))
+            encode_fca([str(output_file)], str(output_file))
 
 
 class TestFCADecode:
@@ -205,7 +205,7 @@ class TestFCADecode:
         
         # Create FCA file
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(single_file_dir), str(fca_file))
+        encode_fca([str(single_file_dir)], str(fca_file))
         
         # Decode it
         output_dir = Path(temp_dir) / 'output'
@@ -232,7 +232,7 @@ class TestFCADecode:
         """Test decoding multiple files."""
         # Create FCA file
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(test_data_dir), str(fca_file))
+        encode_fca([str(test_data_dir)], str(fca_file))
         
         # Decode it
         output_dir = Path(temp_dir) / 'output'
@@ -261,7 +261,7 @@ class TestFCADecode:
         
         # Create FCA file with empty file
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(empty_file_dir), str(fca_file))
+        encode_fca([str(empty_file_dir)], str(fca_file))
         
         # Decode it
         output_dir = Path(temp_dir) / 'output'
@@ -307,7 +307,7 @@ class TestFCARoundTrip:
         
         # Encode
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(single_file_dir), str(fca_file))
+        encode_fca([str(single_file_dir)], str(fca_file))
         
         # Decode
         output_dir = Path(temp_dir) / 'output'
@@ -325,7 +325,7 @@ class TestFCARoundTrip:
         """Test encoding and decoding multiple files."""
         # Encode
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(test_data_dir), str(fca_file))
+        encode_fca([str(test_data_dir)], str(fca_file))
         
         # Decode
         output_dir = Path(temp_dir) / 'output'
@@ -356,7 +356,7 @@ class TestFCARoundTrip:
         
         # Encode binary file
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(binary_file_dir), str(fca_file))
+        encode_fca([str(binary_file_dir)], str(fca_file))
         
         # Decode
         output_dir = Path(temp_dir) / 'output'
@@ -379,7 +379,7 @@ class TestFCARoundTrip:
         for name in ('test-amiibo-v2.bin', 'test-amiibo-v3.bin'):
             shutil.copy(test_data_dir / name, amiibo_dir / name)
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(amiibo_dir), str(fca_file))
+        encode_fca([str(amiibo_dir)], str(fca_file))
         output_dir = Path(temp_dir) / 'output'
         decode_fca(str(fca_file), str(output_dir))
         for name in ('test-amiibo-v2.bin', 'test-amiibo-v3.bin'):
@@ -393,9 +393,12 @@ class TestFCARoundTrip:
     
     def test_round_trip_large_file(self, temp_dir, test_data_dir):
         """Test round-trip with a larger file."""
-        # Encode
+        # Encode from a dir containing only large.txt
+        large_file_dir = Path(temp_dir) / 'large_file'
+        large_file_dir.mkdir()
+        shutil.copy(test_data_dir / 'large.txt', large_file_dir / 'large.txt')
         fca_file = Path(temp_dir) / 'test.fca'
-        encode_fca(str(test_data_dir / 'large.txt'), str(fca_file))
+        encode_fca([str(large_file_dir)], str(fca_file))
         
         # Decode
         output_dir = Path(temp_dir) / 'output'
@@ -423,7 +426,7 @@ class TestFCAFormat:
         shutil.copy(test_data_dir / 'file1.txt', single_file_dir / 'file1.txt')
         
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(single_file_dir), str(output_file))
+        encode_fca([str(single_file_dir)], str(output_file))
         
         with open(output_file, 'rb') as f:
             # Global header: 3 bytes magic + 1 byte version
@@ -457,7 +460,7 @@ class TestFCAFormat:
     def test_big_endian_encoding(self, temp_dir, test_data_dir):
         """Test that multi-byte integers are big-endian."""
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(test_data_dir / 'file1.txt'), str(output_file))
+        encode_fca([str(test_data_dir / 'file1.txt')], str(output_file))
         
         with open(output_file, 'rb') as f:
             f.read(4)  # Skip magic + version
@@ -476,7 +479,7 @@ class TestFCAFormat:
     def test_embedded_file_types_match_detection(self, temp_dir, test_data_dir):
         """Verify each embedded file's type byte matches encoder detection."""
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(test_data_dir), str(output_file))
+        encode_fca([str(test_data_dir)], str(output_file))
         with open(output_file, 'rb') as f:
             assert f.read(3) == b'FCA'
             version = struct.unpack('>B', f.read(1))[0]
@@ -508,7 +511,7 @@ class TestFCAFormat:
         shutil.copy(test_data_dir / 'test-amiibo-v2.bin', amiibo_dir / 'test-amiibo-v2.bin')
         shutil.copy(test_data_dir / 'test-amiibo-v3.bin', amiibo_dir / 'test-amiibo-v3.bin')
         output_file = Path(temp_dir) / 'output.fca'
-        encode_fca(str(amiibo_dir), str(output_file))
+        encode_fca([str(amiibo_dir)], str(output_file))
         with open(output_file, 'rb') as f:
             assert f.read(3) == b'FCA'
             assert struct.unpack('>B', f.read(1))[0] == 1
