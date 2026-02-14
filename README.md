@@ -134,3 +134,18 @@ python python/fca_tool.py --gui
 
 If run without subcommands, GUI mode starts automatically.
 In the GUI Encode tab, you can add individual files or add a folder recursively.
+
+## GitHub Actions build
+
+This repository includes a workflow at [.github/workflows/build-exes.yml](.github/workflows/build-exes.yml) that builds:
+
+- `fca-encode.exe`
+- `fca-decode.exe`
+- `fca-tool.exe`
+
+Targets:
+
+- `windows-x64` on GitHub-hosted `windows-latest`
+- `windows-arm64` on a self-hosted runner labeled `self-hosted`, `Windows`, `ARM64`
+
+The workflow runs on `push`, `pull_request`, and `workflow_dispatch`, and uploads artifacts per target.

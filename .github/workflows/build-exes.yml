@@ -1,0 +1,62 @@
+name: Build Windows EXEs
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            runner: '["windows-latest"]'
+            python: '3.12'
+          - target: windows-arm64
+            runner: '["self-hosted", "Windows", "ARM64"]'
+            python: '3.12'
+
+    runs-on: ${{ fromJSON(matrix.runner) }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install build dependencies
+        working-directory: python
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+
+      - name: Run parity smoke test
+        working-directory: python
+        run: |
+          python -m unittest tests.test_fca_unittest.TestFCAToolParity.test_tool_encode_decode_matches_standalone -v
+
+      - name: Build executables
+        working-directory: python
+        run: |
+          python -m PyInstaller --clean --noconfirm --onefile --name fca-encode --distpath ../dist/${{ matrix.target }} fca_encode.py
+          python -m PyInstaller --clean --noconfirm --onefile --name fca-decode --distpath ../dist/${{ matrix.target }} fca_decode.py
+          python -m PyInstaller --clean --noconfirm --onefile --name fca-tool --distpath ../dist/${{ matrix.target }} fca_tool.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fca-exes-${{ matrix.target }}
+          path: |
+            dist/${{ matrix.target }}/fca-encode.exe
+            dist/${{ matrix.target }}/fca-decode.exe
+            dist/${{ matrix.target }}/fca-tool.exe
+          if-no-files-found: error
