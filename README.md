@@ -48,15 +48,18 @@ Install build dependencies:
 python -m pip install -r python/requirements-build.txt
 ```
 
-### One-time icon generation
+### Icon data generation
 
-Generate `python/small-logo.ico` once from `python/small-logo.png`:
+Generate `python/icon_data.py` from an image (`.png` or `.ico`):
 
 ```bash
-make build-icon
+python python/generate_icon_data.py --input-file python/small-logo.png --output-file python/icon_data.py
 ```
 
-After this, all exe builds reuse `python/small-logo.ico` directly (no reconversion per build).
+`icon_data.py` contains embedded icon bytes that are used by:
+
+- `fca_tool.py` for GUI window icon (top-left)
+- build/export flow for executable icon embedding
 
 ### Build both executables
 
@@ -151,5 +154,10 @@ Targets:
 The workflow runs `windows-x64` on `push`, `pull_request`, and `workflow_dispatch`.
 The `windows-arm64` job runs only when manually triggered with `build_arm64=true`.
 
-Executable icons in CI are generated from embedded icon bytes in `python/icon_data.py`
-via `python/ensure_icon_from_data.py`, so builds do not depend on external icon files.
+Executable icons in CI are generated via:
+
+```bash
+python fca_tool.py --export-icon .build-icon.ico
+```
+
+This uses embedded bytes from `python/icon_data.py`, so builds do not depend on external image files.

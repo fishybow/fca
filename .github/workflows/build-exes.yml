@@ -39,17 +39,58 @@ jobs:
         run: |
           python -m unittest tests.test_fca_unittest.TestFCAToolParity.test_tool_encode_decode_matches_standalone -v
 
-      - name: Materialize icon from embedded data
+      - name: Materialize icon from fca_tool embedded data
         working-directory: python
         run: |
-          python ensure_icon_from_data.py --output-file .build-icon.ico
+          python fca_tool.py --export-icon .build-icon.ico
 
-      - name: Build executables
+      - name: Debug build inputs
         working-directory: python
         run: |
-          python -m PyInstaller --clean --noconfirm --onefile --icon .build-icon.ico --name fca-encode --distpath ../dist/windows-x64 fca_encode.py
-          python -m PyInstaller --clean --noconfirm --onefile --icon .build-icon.ico --name fca-decode --distpath ../dist/windows-x64 fca_decode.py
-          python -m PyInstaller --clean --noconfirm --onefile --icon .build-icon.ico --name fca-tool --distpath ../dist/windows-x64 fca_tool.py
+          $ErrorActionPreference = 'Stop'
+          Write-Host "Working directory: $(Get-Location)"
+          Write-Host "Python:"
+          python --version
+          Write-Host "Top-level python directory contents:"
+          Get-ChildItem -Force | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+          if (!(Test-Path .build-icon.ico)) {
+            throw "Missing .build-icon.ico before PyInstaller build"
+          }
+          Write-Host "Icon file metadata:"
+          Get-Item .build-icon.ico | Select-Object FullName, Length, LastWriteTime | Format-List
+          Write-Host "Icon SHA256:"
+          Get-FileHash .build-icon.ico -Algorithm SHA256 | Format-List
+
+      - name: Build executables (verbose)
+        working-directory: python
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          Write-Host "Running: python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-encode --distpath ../dist/windows-x64 fca_encode.py"
+          & python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-encode --distpath ../dist/windows-x64 fca_encode.py 2>&1 | Tee-Object -FilePath pyinstaller-fca-encode.log
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for fca-encode" }
+
+          Write-Host "Running: python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-decode --distpath ../dist/windows-x64 fca_decode.py"
+          & python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-decode --distpath ../dist/windows-x64 fca_decode.py 2>&1 | Tee-Object -FilePath pyinstaller-fca-decode.log
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for fca-decode" }
+
+          Write-Host "Running: python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-tool --distpath ../dist/windows-x64 fca_tool.py"
+          & python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-tool --distpath ../dist/windows-x64 fca_tool.py 2>&1 | Tee-Object -FilePath pyinstaller-fca-tool.log
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for fca-tool" }
+
+          Write-Host "Built files:"
+          Get-ChildItem ../dist/windows-x64 -File | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+
+      - name: Upload debug logs (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: fca-build-debug-windows-x64
+          path: |
+            python/.build-icon.ico
+            python/pyinstaller-*.log
+            python/*.spec
+            python/build/**/warn-*.txt
+          if-no-files-found: warn
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -87,17 +128,58 @@ jobs:
         run: |
           python -m unittest tests.test_fca_unittest.TestFCAToolParity.test_tool_encode_decode_matches_standalone -v
 
-      - name: Materialize icon from embedded data
+      - name: Materialize icon from fca_tool embedded data
         working-directory: python
         run: |
-          python ensure_icon_from_data.py --output-file .build-icon.ico
+          python fca_tool.py --export-icon .build-icon.ico
 
-      - name: Build executables
+      - name: Debug build inputs
         working-directory: python
         run: |
-          python -m PyInstaller --clean --noconfirm --onefile --icon .build-icon.ico --name fca-encode --distpath ../dist/windows-arm64 fca_encode.py
-          python -m PyInstaller --clean --noconfirm --onefile --icon .build-icon.ico --name fca-decode --distpath ../dist/windows-arm64 fca_decode.py
-          python -m PyInstaller --clean --noconfirm --onefile --icon .build-icon.ico --name fca-tool --distpath ../dist/windows-arm64 fca_tool.py
+          $ErrorActionPreference = 'Stop'
+          Write-Host "Working directory: $(Get-Location)"
+          Write-Host "Python:"
+          python --version
+          Write-Host "Top-level python directory contents:"
+          Get-ChildItem -Force | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+          if (!(Test-Path .build-icon.ico)) {
+            throw "Missing .build-icon.ico before PyInstaller build"
+          }
+          Write-Host "Icon file metadata:"
+          Get-Item .build-icon.ico | Select-Object FullName, Length, LastWriteTime | Format-List
+          Write-Host "Icon SHA256:"
+          Get-FileHash .build-icon.ico -Algorithm SHA256 | Format-List
+
+      - name: Build executables (verbose)
+        working-directory: python
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          Write-Host "Running: python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-encode --distpath ../dist/windows-arm64 fca_encode.py"
+          & python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-encode --distpath ../dist/windows-arm64 fca_encode.py 2>&1 | Tee-Object -FilePath pyinstaller-fca-encode.log
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for fca-encode" }
+
+          Write-Host "Running: python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-decode --distpath ../dist/windows-arm64 fca_decode.py"
+          & python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-decode --distpath ../dist/windows-arm64 fca_decode.py 2>&1 | Tee-Object -FilePath pyinstaller-fca-decode.log
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for fca-decode" }
+
+          Write-Host "Running: python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-tool --distpath ../dist/windows-arm64 fca_tool.py"
+          & python -m PyInstaller --clean --noconfirm --onefile --log-level DEBUG --icon .build-icon.ico --name fca-tool --distpath ../dist/windows-arm64 fca_tool.py 2>&1 | Tee-Object -FilePath pyinstaller-fca-tool.log
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for fca-tool" }
+
+          Write-Host "Built files:"
+          Get-ChildItem ../dist/windows-arm64 -File | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+
+      - name: Upload debug logs (arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: fca-build-debug-windows-arm64
+          path: |
+            python/.build-icon.ico
+            python/pyinstaller-*.log
+            python/*.spec
+            python/build/**/warn-*.txt
+          if-no-files-found: warn
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -2,17 +2,13 @@
 """Materialize embedded ICO icon bytes to disk for PyInstaller --icon usage."""
 
 import argparse
-import base64
-from pathlib import Path
 
-from icon_data import ICON_ICO_B64
+from icon_data import get_icon_bytes, write_icon_file
 
 
 def ensure_icon(output_file):
-    output_path = Path(output_file)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    data = base64.b64decode(ICON_ICO_B64)
-    output_path.write_bytes(data)
+    output_path = write_icon_file(output_file)
+    data = get_icon_bytes()
     print(f"Wrote icon: {output_path} ({len(data)} bytes)")
 
 

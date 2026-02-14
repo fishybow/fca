@@ -13,6 +13,7 @@ If no command is provided, GUI mode is started.
 import argparse
 import os
 import struct
+import tempfile
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -26,18 +27,8 @@ from constants import (
     FILE_TYPE_LEGO_DIMENSIONS,
 )
 from fca_encode import detect_file_type
-from fca_decode import decode_fca
-
-# File type names mapping
-FILE_TYPE_NAMES = {
-    FILE_TYPE_UNKNOWN: "Unknown",
-    FILE_TYPE_AMIIBO_V2: "amiibo v2",
-    FILE_TYPE_AMIIBO_V3: "amiibo v3",
-    FILE_TYPE_SKYLANDER: "Skylander",
-    FILE_TYPE_DISNEY_INFINITY: "Disney Infinity",
-    FILE_TYPE_LEGO_DIMENSIONS: "Lego Dimensions",
-}
-
+from fca_decode import decode_fca, FILE_TYPE_NAMES
+from icon_data import write_icon_file
 
 def get_file_type_name(file_type):
     """Get human-readable name for a file type."""
@@ -116,12 +107,29 @@ def encode_fca_from_sources(output_file, input_files=None, input_dirs=None):
     print(f"Embedded {len(resolved_files)} files")
 
 
+def export_embedded_icon(output_file):
+    """Write embedded icon bytes to an .ico file."""
+    output_path = write_icon_file(output_file)
+    print(f"Wrote icon: {output_path}")
+
+
+def apply_window_icon(root):
+    """Apply embedded icon as top-left GUI window icon on Windows."""
+    try:
+        icon_path = Path(tempfile.gettempdir()) / "fca-tool-icon.ico"
+        write_icon_file(icon_path)
+        root.iconbitmap(default=str(icon_path))
+    except Exception:
+        pass
+
+
 def run_gui():
     """Launch GUI mode for FCA encode/decode operations."""
 
     root = tk.Tk()
     root.title("FCA Tool")
     root.geometry("760x500")
+    apply_window_icon(root)
 
     notebook = ttk.Notebook(root)
     notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -298,6 +306,7 @@ def run_gui():
 def main():
     parser = argparse.ArgumentParser(description="Unified FCA encoder/decoder tool (CLI + GUI)")
     parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
+    parser.add_argument("--export-icon", metavar="<file>", help="Write embedded icon to .ico file and exit")
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -336,6 +345,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.export_icon:
+        export_embedded_icon(args.export_icon)
+        return
 
     if args.gui or args.command is None:
         run_gui()
