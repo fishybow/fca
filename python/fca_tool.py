@@ -13,6 +13,7 @@ If no command is provided, GUI mode is started.
 import argparse
 import os
 import struct
+import sys
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -26,22 +27,7 @@ from constants import (
     FILE_TYPE_LEGO_DIMENSIONS,
 )
 from fca_encode import detect_file_type
-from fca_decode import decode_fca
-
-# File type names mapping
-FILE_TYPE_NAMES = {
-    FILE_TYPE_UNKNOWN: "Unknown",
-    FILE_TYPE_AMIIBO_V2: "amiibo v2",
-    FILE_TYPE_AMIIBO_V3: "amiibo v3",
-    FILE_TYPE_SKYLANDER: "Skylander",
-    FILE_TYPE_DISNEY_INFINITY: "Disney Infinity",
-    FILE_TYPE_LEGO_DIMENSIONS: "Lego Dimensions",
-}
-
-
-def get_file_type_name(file_type):
-    """Get human-readable name for a file type."""
-    return FILE_TYPE_NAMES.get(file_type, f"Reserved ({file_type})")
+from fca_decode import decode_fca, FILE_TYPE_NAMES, get_file_type_name
 
 
 def collect_input_files(input_files=None, input_dirs=None):
@@ -116,12 +102,40 @@ def encode_fca_from_sources(output_file, input_files=None, input_dirs=None):
     print(f"Embedded {len(resolved_files)} files")
 
 
+def apply_window_icon(root):
+    """Apply custom window icon instead of Tk's default feather icon."""
+    if os.name != "nt":
+        return
+
+    try:
+        if getattr(sys, "frozen", False):
+            root.iconbitmap(default=sys.executable)
+            return
+    except Exception:
+        pass
+
+    candidate_paths = [
+        Path(__file__).with_name("small-logo.ico"),
+        Path.cwd() / "small-logo.ico",
+        Path.cwd() / "python" / "small-logo.ico",
+    ]
+
+    for icon_path in candidate_paths:
+        try:
+            if icon_path.is_file():
+                root.iconbitmap(default=str(icon_path))
+                return
+        except Exception:
+            continue
+
+
 def run_gui():
     """Launch GUI mode for FCA encode/decode operations."""
 
     root = tk.Tk()
     root.title("FCA Tool")
     root.geometry("760x500")
+    apply_window_icon(root)
 
     notebook = ttk.Notebook(root)
     notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
