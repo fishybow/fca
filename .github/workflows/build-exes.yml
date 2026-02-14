@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -113,3 +115,30 @@ jobs:
             dist/windows-arm64/fca-decode.exe
             dist/windows-arm64/fca-tool.exe
           if-no-files-found: error
+
+  release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-windows-x64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download windows-x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: fca-exes-windows-x64
+
+      - name: Create Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: |
+            dist/windows-x64/fca-encode.exe
+            dist/windows-x64/fca-decode.exe
+            dist/windows-x64/fca-tool.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
