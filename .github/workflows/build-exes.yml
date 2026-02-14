@@ -39,12 +39,19 @@ jobs:
         run: |
           python -m unittest tests.test_fca_unittest.TestFCAToolParity.test_tool_encode_decode_matches_standalone -v
 
+      - name: Ensure icon file exists
+        working-directory: python
+        run: |
+          if (!(Test-Path small-logo.ico)) {
+            python build_icon.py --input-file small-logo.png --output-file small-logo.ico
+          }
+
       - name: Build executables
         working-directory: python
         run: |
-          python -m PyInstaller --clean --noconfirm --onefile --name fca-encode --distpath ../dist/windows-x64 fca_encode.py
-          python -m PyInstaller --clean --noconfirm --onefile --name fca-decode --distpath ../dist/windows-x64 fca_decode.py
-          python -m PyInstaller --clean --noconfirm --onefile --name fca-tool --distpath ../dist/windows-x64 fca_tool.py
+          python -m PyInstaller --clean --noconfirm --onefile --icon small-logo.ico --name fca-encode --distpath ../dist/windows-x64 fca_encode.py
+          python -m PyInstaller --clean --noconfirm --onefile --icon small-logo.ico --name fca-decode --distpath ../dist/windows-x64 fca_decode.py
+          python -m PyInstaller --clean --noconfirm --onefile --icon small-logo.ico --name fca-tool --distpath ../dist/windows-x64 fca_tool.py
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -82,12 +89,19 @@ jobs:
         run: |
           python -m unittest tests.test_fca_unittest.TestFCAToolParity.test_tool_encode_decode_matches_standalone -v
 
+      - name: Ensure icon file exists
+        working-directory: python
+        run: |
+          if (!(Test-Path small-logo.ico)) {
+            python build_icon.py --input-file small-logo.png --output-file small-logo.ico
+          }
+
       - name: Build executables
         working-directory: python
         run: |
-          python -m PyInstaller --clean --noconfirm --onefile --name fca-encode --distpath ../dist/windows-arm64 fca_encode.py
-          python -m PyInstaller --clean --noconfirm --onefile --name fca-decode --distpath ../dist/windows-arm64 fca_decode.py
-          python -m PyInstaller --clean --noconfirm --onefile --name fca-tool --distpath ../dist/windows-arm64 fca_tool.py
+          python -m PyInstaller --clean --noconfirm --onefile --icon small-logo.ico --name fca-encode --distpath ../dist/windows-arm64 fca_encode.py
+          python -m PyInstaller --clean --noconfirm --onefile --icon small-logo.ico --name fca-decode --distpath ../dist/windows-arm64 fca_decode.py
+          python -m PyInstaller --clean --noconfirm --onefile --icon small-logo.ico --name fca-tool --distpath ../dist/windows-arm64 fca_tool.py
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
