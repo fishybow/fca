@@ -51,15 +51,35 @@ def get_file_type_name(file_type):
     return FILE_TYPE_NAMES.get(file_type, f"Reserved ({file_type})")
 
 
-def load_amiibo_database():
+def load_amiibo_database(custom_database_path=None):
     """
     Load the amiibo database from local file if available.
+    
+    Args:
+        custom_database_path: Optional path to a custom database file. If provided, this path is used.
     
     Returns:
         Dictionary with amiibo data, or None if file not found
     """
     global _AMIIBO_DATABASE, _DATABASE_LOAD_ATTEMPTED
     
+    # If custom database specified, don't use cache
+    if custom_database_path:
+        try:
+            db_path = Path(custom_database_path)
+            if db_path.is_file():
+                with open(db_path, 'r', encoding='utf-8') as f:
+                    database = json.load(f)
+                    print(f"Loaded amiibo database from: {db_path}")
+                    return database
+            else:
+                print(f"Custom database file not found: {db_path}")
+                return None
+        except Exception as e:
+            print(f"Error loading custom database: {e}")
+            return None
+    
+    # Use cached result if already attempted
     if _DATABASE_LOAD_ATTEMPTED:
         return _AMIIBO_DATABASE
     
@@ -117,25 +137,26 @@ def extract_amiibo_id(content):
     return None, None
 
 
-def lookup_amiibo_data(head_id=None, tail_id=None):
+def lookup_amiibo_data(head_id=None, tail_id=None, custom_database_path=None):
     """
-    Lookup amiibo information from local database or amiiboapi.org API.
-    Try local database first (faster, no rate limit), then API as fallback.
+    Lookup amiibo information from local database only.
+    No online API calls - uses only the cached local database.
     
     Args:
         head_id: The amiibo head ID as a hex string
         tail_id: The amiibo tail ID as a hex string
+        custom_database_path: Optional path to a custom database file
         
     Returns:
         A tuple of (series_name, amiibo_type, amiibo_name, lookup_method) 
         or (None, None, None, None) if not found
-        lookup_method is "database_head+tail", "database_tail", "api_head+tail", "api_tail", or "not_found"
+        lookup_method is "database_head+tail", "database_tail", or "not_found"
     """
     if not head_id or not tail_id:
         return None, None, None, None
     
-    # Try local database first
-    db = load_amiibo_database()
+    # Try local database only (no online API calls)
+    db = load_amiibo_database(custom_database_path=custom_database_path)
     if db:
         amiibo_list = db.get("amiibo", [])
         
@@ -155,42 +176,7 @@ def lookup_amiibo_data(head_id=None, tail_id=None):
                 amiibo_name = amiibo.get("name", "Unknown")
                 return series_name, amiibo_type, amiibo_name, "database_tail"
     
-    # Fallback to API if database unavailable or lookup failed
-    try:
-        # Try with both head and tail first (most accurate)
-        url = f"https://amiiboapi.org/api/amiibo/?head={head_id}&tail={tail_id}"
-        response = requests.get(url, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            amiibo_list = data.get("amiibo", [])
-            
-            if amiibo_list:
-                amiibo = amiibo_list[0]
-                series_name = amiibo.get("amiiboSeries", "Unknown")
-                amiibo_type = amiibo.get("type", "Unknown")
-                amiibo_name = amiibo.get("name", "Unknown")
-                return series_name, amiibo_type, amiibo_name, "api_head+tail"
-        
-        # Fallback to tail only
-        url = f"https://amiiboapi.org/api/amiibo/?tail={tail_id}"
-        response = requests.get(url, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            amiibo_list = data.get("amiibo", [])
-            
-            if amiibo_list:
-                amiibo = amiibo_list[0]
-                series_name = amiibo.get("amiiboSeries", "Unknown")
-                amiibo_type = amiibo.get("type", "Unknown")
-                amiibo_name = amiibo.get("name", "Unknown")
-                return series_name, amiibo_type, amiibo_name, "api_tail"
-                
-    except Exception as e:
-        # Silently fail and return None
-        pass
-    
+    # Database not available or amiibo not found - return None (will use MD5 fallback)
     return None, None, None, "not_found"
 
 
@@ -217,6 +203,52 @@ def sanitize_filename(filename):
         filename = filename[:200]
     
     return filename
+
+
+def download_amiibo_database_to_script_dir(force=False):
+    """
+    Download the amiibo database from amiiboapi.org and save to script directory.
+    
+    Args:
+        force: If True, re-download even if the file already exists
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        db_path = Path(__file__).with_name("amiibo_database.json")
+        
+        # Check if file exists and skip if not forcing
+        if db_path.is_file() and not force:
+            print(f"Database already exists at: {db_path}")
+            return True
+        
+        print(f"Downloading amiibo database from amiiboapi.org...")
+        url = "https://amiiboapi.org/api/amiibo/"
+        response = requests.get(url, timeout=30)
+        
+        if response.status_code != 200:
+            print(f"Error: API returned status code {response.status_code}")
+            return False
+        
+        data = response.json()
+        amiibo_list = data.get("amiibo", [])
+        
+        if not amiibo_list:
+            print("Error: No amiibo data received from API")
+            return False
+        
+        # Save to file
+        with open(db_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        
+        print(f"Downloaded {len(amiibo_list)} amiibo entries (~{db_path.stat().st_size / 1024 / 1024:.2f} MB)")
+        print(f"Saved to: {db_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Error downloading database: {e}")
+        return False
 
 
 def make_unique_filename(output_file):
@@ -247,7 +279,7 @@ def make_unique_filename(output_file):
         counter += 1
 
 
-def decode_fca(input_file, output_dir, use_pro_names=False):
+def decode_fca(input_file, output_dir, use_pro_names=False, database_file=None):
     """
     Extract all embedded files from an FCA archive.
     Files are named by their MD5 hash, or by amiibo series/name if available.
@@ -256,6 +288,7 @@ def decode_fca(input_file, output_dir, use_pro_names=False):
         input_file: Path to input FCA file
         output_dir: Path to output directory
         use_pro_names: If True, use "Pro" naming (no extensions) for amiibo files
+        database_file: Optional path to a custom amiibo database JSON file
     """
     input_path = Path(input_file)
     output_path = Path(output_dir)
@@ -326,7 +359,7 @@ def decode_fca(input_file, output_dir, use_pro_names=False):
             if file_type in (FILE_TYPE_AMIIBO_V2, FILE_TYPE_AMIIBO_V3):
                 head_id, tail_id = extract_amiibo_id(content)
                 if head_id and tail_id:
-                    series_name, amiibo_type, amiibo_name, lookup_method = lookup_amiibo_data(head_id, tail_id)
+                    series_name, amiibo_type, amiibo_name, lookup_method = lookup_amiibo_data(head_id, tail_id, custom_database_path=database_file)
                     if series_name and amiibo_type and amiibo_name:
                         # Sanitize filenames
                         safe_series = sanitize_filename(series_name)

@@ -450,6 +450,18 @@ def main():
         action="store_true",
         help="Use Pro file names (no extensions) for amiibo files",
     )
+    decode_parser.add_argument(
+        "--database",
+        metavar="<file>",
+        help="Path to custom amiibo database JSON file",
+    )
+
+    download_parser = subparsers.add_parser("download-database", help="Download amiibo database from amiiboapi.org")
+    download_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-download even if database already exists",
+    )
 
     args = parser.parse_args()
 
@@ -465,7 +477,12 @@ def main():
                 input_dirs=args.input_dirs,
             )
         elif args.command == "decode":
-            decode_fca(args.input_file, args.output_dir, use_pro_names=args.pro_names)
+            decode_fca(args.input_file, args.output_dir, use_pro_names=args.pro_names, database_file=args.database if hasattr(args, 'database') else None)
+        elif args.command == "download-database":
+            from fca_decode import download_amiibo_database_to_script_dir
+            success = download_amiibo_database_to_script_dir(force=args.force if hasattr(args, 'force') else False)
+            if not success:
+                os.sys.exit(1)
         else:
             parser.print_help()
             os.sys.exit(1)
