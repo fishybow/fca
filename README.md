@@ -63,7 +63,7 @@ After this, all exe builds reuse `python/small-logo.ico` directly (no reconversi
 From the repository root:
 
 ```bash
-make build-exes
+make PYTHON=python build-exes
 ```
 
 This generates:

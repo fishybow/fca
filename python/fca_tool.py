@@ -15,8 +15,6 @@ import os
 import struct
 import sys
 from pathlib import Path
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
 
 from constants import (
     FILE_TYPE_UNKNOWN,
@@ -131,6 +129,13 @@ def apply_window_icon(root):
 
 def run_gui():
     """Launch GUI mode for FCA encode/decode operations."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox, ttk
+    except Exception as e:
+        print("Error: tkinter is required for GUI mode but is not available.", file=sys.stderr)
+        print(f"Details: {e}", file=sys.stderr)
+        sys.exit(1)
 
     root = tk.Tk()
     root.title("FCA Tool")
