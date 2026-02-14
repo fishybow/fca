@@ -146,6 +146,7 @@ This repository includes a workflow at [.github/workflows/build-exes.yml](.githu
 Targets:
 
 - `windows-x64` on GitHub-hosted `windows-latest`
-- `windows-arm64` on a self-hosted runner labeled `self-hosted`, `Windows`, `ARM64`
+- `windows-arm64` on a self-hosted runner labeled `self-hosted`, `Windows`, `ARM64` (manual workflow dispatch only)
 
-The workflow runs on `push`, `pull_request`, and `workflow_dispatch`, and uploads artifacts per target.
+The workflow runs `windows-x64` on `push`, `pull_request`, and `workflow_dispatch`.
+The `windows-arm64` job runs only when manually triggered with `build_arm64=true`.
