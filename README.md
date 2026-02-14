@@ -150,3 +150,6 @@ Targets:
 
 The workflow runs `windows-x64` on `push`, `pull_request`, and `workflow_dispatch`.
 The `windows-arm64` job runs only when manually triggered with `build_arm64=true`.
+
+Executable icons in CI are generated from embedded icon bytes in `python/icon_data.py`
+via `python/ensure_icon_from_data.py`, so builds do not depend on external icon files.
