@@ -17,6 +17,7 @@ import os
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from fca_encode import encode_fca, detect_file_type
 from fca_decode import decode_fca
+from fca_tool import encode_fca_from_sources
 from constants import (
     FILE_TYPE_AMIIBO_V2,
     FILE_TYPE_AMIIBO_V3,
@@ -408,6 +409,44 @@ class TestFCARoundTrip(unittest.TestCase):
             self.assertTrue(extracted_file.exists(), f"File {name} (MD5 {expected_md5}) not found")
             with open(extracted_file, 'rb') as f:
                 self.assertEqual(f.read(), original_content)
+
+
+class TestFCAToolParity(unittest.TestCase):
+    """Parity tests between standalone scripts and unified fca_tool behavior."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_data_dir = Path(__file__).parent / 'test_data'
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_tool_encode_decode_matches_standalone(self):
+        """Ensure tool encode/decode behavior matches standalone encode/decode."""
+        encode_output = Path(self.temp_dir) / 'standalone.fca'
+        tool_output = Path(self.temp_dir) / 'tool.fca'
+
+        encode_fca([str(self.test_data_dir)], str(encode_output))
+        encode_fca_from_sources(output_file=str(tool_output), input_dirs=[str(self.test_data_dir)])
+
+        with open(encode_output, 'rb') as f:
+            standalone_bytes = f.read()
+        with open(tool_output, 'rb') as f:
+            tool_bytes = f.read()
+
+        self.assertEqual(standalone_bytes, tool_bytes)
+        self.assertGreaterEqual(standalone_bytes.count(b'FCA'), 1)
+        self.assertEqual(standalone_bytes[:3], b'FCA')
+
+        decode_output_standalone = Path(self.temp_dir) / 'decode_standalone'
+        decode_output_tool = Path(self.temp_dir) / 'decode_tool'
+
+        decode_fca(str(encode_output), str(decode_output_standalone))
+        decode_fca(str(tool_output), str(decode_output_tool))
+
+        standalone_names = sorted(p.name for p in decode_output_standalone.iterdir() if p.is_file())
+        tool_names = sorted(p.name for p in decode_output_tool.iterdir() if p.is_file())
+        self.assertEqual(standalone_names, tool_names)
 
 
 class TestFCAFormat(unittest.TestCase):

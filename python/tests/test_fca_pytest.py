@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from fca_encode import encode_fca, detect_file_type
 from fca_decode import decode_fca
+from fca_tool import encode_fca_from_sources
 from constants import FILE_TYPE_AMIIBO_V2, FILE_TYPE_AMIIBO_V3
 
 
@@ -334,6 +335,37 @@ class TestFCADecode:
         
         with pytest.raises(ValueError, match="Input file does not exist"):
             decode_fca('/nonexistent/file.fca', str(output_dir))
+
+
+class TestFCAToolParity:
+    """Parity tests between standalone scripts and unified fca_tool behavior."""
+
+    def test_tool_encode_decode_matches_standalone(self, temp_dir, test_data_dir):
+        """Ensure tool encode/decode behavior matches standalone encode/decode."""
+        encode_output = Path(temp_dir) / 'standalone.fca'
+        tool_output = Path(temp_dir) / 'tool.fca'
+
+        encode_fca([str(test_data_dir)], str(encode_output))
+        encode_fca_from_sources(output_file=str(tool_output), input_dirs=[str(test_data_dir)])
+
+        with open(encode_output, 'rb') as f:
+            standalone_bytes = f.read()
+        with open(tool_output, 'rb') as f:
+            tool_bytes = f.read()
+
+        assert standalone_bytes == tool_bytes
+        assert standalone_bytes.count(b'FCA') >= 1
+        assert standalone_bytes[:3] == b'FCA'
+
+        decode_output_standalone = Path(temp_dir) / 'decode_standalone'
+        decode_output_tool = Path(temp_dir) / 'decode_tool'
+
+        decode_fca(str(encode_output), str(decode_output_standalone))
+        decode_fca(str(tool_output), str(decode_output_tool))
+
+        standalone_names = sorted(p.name for p in decode_output_standalone.iterdir() if p.is_file())
+        tool_names = sorted(p.name for p in decode_output_tool.iterdir() if p.is_file())
+        assert standalone_names == tool_names
 
 
 class TestFCARoundTrip:
