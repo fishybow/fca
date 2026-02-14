@@ -32,3 +32,105 @@ FCA files (`.fca` extension) consist of:
 - One or more embedded files, each with version-dependent headers containing file type and metadata
 
 See [SPEC.md](SPEC.md) for the complete format specification.
+
+## Build self-contained Windows executables
+
+You can package both Python tools as standalone `.exe` files using PyInstaller.
+
+### Prerequisites
+
+- Windows with Python installed
+- build dependencies installed in your Python environment
+
+Install build dependencies:
+
+```bash
+python -m pip install -r python/requirements-build.txt
+```
+
+### One-time icon generation
+
+Generate `python/small-logo.ico` once from `python/small-logo.png`:
+
+```bash
+make build-icon
+```
+
+After this, all exe builds reuse `python/small-logo.ico` directly (no reconversion per build).
+
+### Build both executables
+
+From the repository root:
+
+```bash
+make build-exes
+```
+
+This generates:
+
+- `dist/windows/fca-encode.exe`
+- `dist/windows/fca-decode.exe`
+- `dist/windows/fca-tool.exe`
+
+### Build individually
+
+```bash
+make build-exe-encode
+make build-exe-decode
+make build-exe-tool
+```
+
+If you want to build newer versions of `fca-tool.exe`, build to a unique filename instead:
+
+```bash
+make build-exe-tool-unique
+```
+
+This creates `dist/windows/fca-tool-<timestamp>.exe` and avoids overwriting files.
+
+### Clean build artifacts
+
+```bash
+make clean-build
+```
+
+## Unified CLI + GUI tool
+
+Use `python/fca_tool.py` to run encoding and decoding from a single script.
+
+### CLI mode
+
+Encode from an explicit list of files:
+
+```bash
+python python/fca_tool.py encode --output-file out.fca --input-files file1.bin file2.bin
+```
+
+Encode recursively from one or more directories:
+
+```bash
+python python/fca_tool.py encode --output-file out.fca --input-dirs dumps/ more_dumps/
+```
+
+You can also combine both:
+
+```bash
+python python/fca_tool.py encode --output-file out.fca --input-files file1.bin --input-dirs dumps/
+```
+
+Decode an archive:
+
+```bash
+python python/fca_tool.py decode --input-file out.fca --output-dir extracted
+```
+
+### GUI mode
+
+Launch GUI directly:
+
+```bash
+python python/fca_tool.py --gui
+```
+
+If run without subcommands, GUI mode starts automatically.
+In the GUI Encode tab, you can add individual files or add a folder recursively.
