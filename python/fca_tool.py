@@ -1,0 +1,495 @@
+#!/usr/bin/env python3
+"""
+FCA Tool - Unified encoder/decoder CLI and GUI.
+
+CLI usage:
+    python fca_tool.py encode --output-file <file> --input-files <file1> [<file2> ...]
+    python fca_tool.py encode --output-file <file> --input-dirs <dir1> [<dir2> ...]
+    (Use exactly one of --input-files or --input-dirs for encoding)
+    python fca_tool.py decode --input-file <file> --output-dir <dir>
+    python fca_tool.py --gui
+
+If no command is provided, GUI mode is started.
+"""
+
+import argparse
+import os
+import struct
+import sys
+from pathlib import Path
+
+from constants import (
+    FILE_TYPE_UNKNOWN,
+    FILE_TYPE_AMIIBO_V2,
+    FILE_TYPE_AMIIBO_V3,
+    FILE_TYPE_SKYLANDER,
+    FILE_TYPE_DISNEY_INFINITY,
+    FILE_TYPE_LEGO_DIMENSIONS,
+)
+from fca_encode import detect_file_type
+from fca_decode import decode_fca, FILE_TYPE_NAMES, get_file_type_name
+
+
+def collect_input_files(input_files=None, input_dirs=None):
+    """Collect input files from explicit files and/or directories recursively."""
+    input_files = input_files or []
+    input_dirs = input_dirs or []
+
+    resolved_files = []
+    seen_paths = set()
+
+    for file_path in input_files:
+        path = Path(file_path)
+        if not path.is_file():
+            raise ValueError(f"Input file does not exist: {file_path}")
+        resolved = str(path.resolve())
+        if resolved not in seen_paths:
+            seen_paths.add(resolved)
+            resolved_files.append(path)
+
+    for input_dir in input_dirs:
+        input_path = Path(input_dir)
+        if not input_path.is_dir():
+            raise ValueError(f"Input path is not a directory: {input_dir}")
+
+        for root, dirs, filenames in os.walk(input_path):
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for filename in filenames:
+                if filename.startswith('.'):
+                    continue
+                file_path = Path(root) / filename
+                resolved = str(file_path.resolve())
+                if resolved not in seen_paths:
+                    seen_paths.add(resolved)
+                    resolved_files.append(file_path)
+
+    if not resolved_files:
+        raise ValueError("At least one input file is required")
+
+    return resolved_files
+
+
+def encode_fca_from_sources(output_file, input_files=None, input_dirs=None):
+    """Create an FCA archive from explicit files and/or recursive directories."""
+    resolved_files = collect_input_files(input_files=input_files, input_dirs=input_dirs)
+
+    # Stable ordering for deterministic archives
+    resolved_files.sort()
+
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, "wb") as f:
+        f.write(b"FCA")
+        f.write(struct.pack(">B", 1))
+
+        for file_path in resolved_files:
+            with open(file_path, "rb") as file_content:
+                content = file_content.read()
+
+            header_size = 2
+            embedded_size = len(content)
+            total_size = 2 + header_size + embedded_size
+
+            f.write(struct.pack(">I", total_size))
+            f.write(struct.pack(">H", header_size))
+
+            file_type = detect_file_type(content)
+            f.write(struct.pack(">BB", file_type, 0x00))
+            f.write(content)
+
+    print(f"Created FCA archive: {output_path}")
+    print(f"Embedded {len(resolved_files)} files")
+
+
+def apply_window_icon(root):
+    """Apply custom window icon instead of Tk's default feather icon."""
+    if os.name != "nt":
+        return
+
+    try:
+        if getattr(sys, "frozen", False):
+            root.iconbitmap(default=sys.executable)
+            return
+    except Exception:
+        pass
+
+    candidate_paths = [
+        Path(__file__).with_name("small-logo.ico"),
+        Path.cwd() / "small-logo.ico",
+        Path.cwd() / "python" / "small-logo.ico",
+    ]
+
+    for icon_path in candidate_paths:
+        try:
+            if icon_path.is_file():
+                root.iconbitmap(default=str(icon_path))
+                return
+        except Exception:
+            continue
+
+
+def run_gui():
+    """Launch GUI mode for FCA encode/decode operations."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox, ttk
+    except Exception as e:
+        print("Error: tkinter is required for GUI mode but is not available.", file=sys.stderr)
+        print(f"Details: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    root = tk.Tk()
+    root.title("FCA Tool")
+    root.geometry("760x500")
+    apply_window_icon(root)
+
+    # Create menu bar
+    menubar = tk.Menu(root)
+    root.config(menu=menubar)
+
+    # File menu
+    file_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="File", menu=file_menu)
+    file_menu.add_command(label="Exit", command=root.quit)
+
+
+    notebook = ttk.Notebook(root)
+    notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    status_var = tk.StringVar(value="Ready")
+
+    # Encode tab
+    encode_tab = ttk.Frame(notebook)
+    notebook.add(encode_tab, text="Encode")
+
+    ttk.Label(encode_tab, text="Input files (and recursive folders)").pack(anchor="w", padx=10, pady=(10, 4))
+
+    list_frame = ttk.Frame(encode_tab)
+    list_frame.pack(fill=tk.BOTH, expand=True, padx=10)
+
+    input_listbox = tk.Listbox(list_frame, selectmode=tk.EXTENDED)
+    input_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    list_scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=input_listbox.yview)
+    list_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    input_listbox.configure(yscrollcommand=list_scrollbar.set)
+
+    buttons_frame = ttk.Frame(encode_tab)
+    buttons_frame.pack(fill=tk.X, padx=10, pady=8)
+
+    def add_files():
+        files = filedialog.askopenfilenames(title="Select input files")
+        for file_path in files:
+            if file_path not in input_listbox.get(0, tk.END):
+                input_listbox.insert(tk.END, file_path)
+        status_var.set(f"Added {len(files)} file(s)")
+
+    def add_folder_recursive():
+        input_dir = filedialog.askdirectory(title="Select input folder (recursive)")
+        if not input_dir:
+            return
+        try:
+            files = collect_input_files(input_dirs=[input_dir])
+        except Exception as e:
+            messagebox.showerror("Encode", f"Error: {e}")
+            return
+
+        existing = set(input_listbox.get(0, tk.END))
+        added = 0
+        for file_path in files:
+            file_str = str(file_path)
+            if file_str not in existing:
+                input_listbox.insert(tk.END, file_str)
+                existing.add(file_str)
+                added += 1
+
+        status_var.set(f"Added {added} file(s) from folder")
+
+    def remove_selected_files():
+        selected = list(input_listbox.curselection())
+        selected.reverse()
+        for index in selected:
+            input_listbox.delete(index)
+        status_var.set("Removed selected file(s)")
+
+    def clear_files():
+        input_listbox.delete(0, tk.END)
+        status_var.set("Cleared file list")
+
+    ttk.Button(buttons_frame, text="Add files", command=add_files).pack(side=tk.LEFT, padx=(0, 6))
+    ttk.Button(buttons_frame, text="Add folder (recursive)", command=add_folder_recursive).pack(side=tk.LEFT, padx=(0, 6))
+    ttk.Button(buttons_frame, text="Remove selected", command=remove_selected_files).pack(side=tk.LEFT, padx=(0, 6))
+    ttk.Button(buttons_frame, text="Clear", command=clear_files).pack(side=tk.LEFT)
+
+    output_frame = ttk.Frame(encode_tab)
+    output_frame.pack(fill=tk.X, padx=10, pady=(6, 10))
+
+    ttk.Label(output_frame, text="Output FCA file:").pack(anchor="w")
+    encode_output_var = tk.StringVar()
+    encode_output_entry = ttk.Entry(output_frame, textvariable=encode_output_var)
+    encode_output_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(4, 0))
+
+    def choose_encode_output():
+        output_file = filedialog.asksaveasfilename(
+            title="Choose output FCA file",
+            defaultextension=".fca",
+            filetypes=[("FCA files", "*.fca"), ("All files", "*.*")],
+        )
+        if output_file:
+            encode_output_var.set(output_file)
+
+    ttk.Button(output_frame, text="Browse", command=choose_encode_output).pack(side=tk.LEFT, padx=(6, 0), pady=(4, 0))
+
+    def encode_from_gui():
+        input_files = list(input_listbox.get(0, tk.END))
+        output_file = encode_output_var.get().strip()
+
+        if not input_files:
+            messagebox.showerror("Encode", "Please add at least one input file.")
+            return
+        if not output_file:
+            messagebox.showerror("Encode", "Please choose an output FCA file.")
+            return
+
+        try:
+            encode_fca_from_sources(output_file=output_file, input_files=input_files)
+            status_var.set(f"Created archive: {output_file}")
+            messagebox.showinfo("Encode", f"Archive created successfully:\n{output_file}")
+        except Exception as e:
+            status_var.set("Encode failed")
+            messagebox.showerror("Encode", f"Error: {e}")
+
+    ttk.Button(encode_tab, text="Create FCA archive", command=encode_from_gui).pack(anchor="e", padx=10, pady=(0, 10))
+
+    # Decode tab
+    decode_tab = ttk.Frame(notebook)
+    notebook.add(decode_tab, text="Decode")
+
+    decode_input_frame = ttk.Frame(decode_tab)
+    decode_input_frame.pack(fill=tk.X, padx=10, pady=(10, 8))
+
+    ttk.Label(decode_input_frame, text="Input FCA file:").pack(anchor="w")
+    decode_input_var = tk.StringVar()
+    decode_input_entry = ttk.Entry(decode_input_frame, textvariable=decode_input_var)
+    decode_input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(4, 0))
+
+    def choose_decode_input():
+        input_file = filedialog.askopenfilename(
+            title="Choose input FCA file",
+            filetypes=[("FCA files", "*.fca"), ("All files", "*.*")],
+        )
+        if input_file:
+            decode_input_var.set(input_file)
+
+    ttk.Button(decode_input_frame, text="Browse", command=choose_decode_input).pack(side=tk.LEFT, padx=(6, 0), pady=(4, 0))
+
+    decode_output_frame = ttk.Frame(decode_tab)
+    decode_output_frame.pack(fill=tk.X, padx=10, pady=(0, 8))
+
+    ttk.Label(decode_output_frame, text="Output directory:").pack(anchor="w")
+    decode_output_var = tk.StringVar()
+    decode_output_entry = ttk.Entry(decode_output_frame, textvariable=decode_output_var)
+    decode_output_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(4, 0))
+
+    def choose_decode_output():
+        output_dir = filedialog.askdirectory(title="Choose output directory")
+        if output_dir:
+            decode_output_var.set(output_dir)
+
+    ttk.Button(decode_output_frame, text="Browse", command=choose_decode_output).pack(side=tk.LEFT, padx=(6, 0), pady=(4, 0))
+
+    # Database status frame
+    db_status_frame = ttk.Frame(decode_tab)
+    db_status_frame.pack(fill=tk.X, padx=10, pady=(0, 8))
+    
+    def check_database_status():
+        """Check if amiibo database exists and return status."""
+        db_path = Path(__file__).parent / "amiibo_database.json"
+        if db_path.is_file():
+            return True, str(db_path)
+        return False, str(db_path)
+    
+    def update_db_status():
+        """Update the database status label color and text."""
+        exists, db_path = check_database_status()
+        if exists:
+            db_status_var.set("✓ Amiibo database loaded")
+            db_status_label.config(foreground="green")
+        else:
+            db_status_var.set("✗ Amiibo database not found - Download required")
+            db_status_label.config(foreground="red")
+    
+    def download_database_gui():
+        """Download amiibo database from API and save locally."""
+        status_var.set("Downloading amiibo database...")
+        root.update()
+        
+        try:
+            import requests
+            db_path = Path(__file__).parent / "amiibo_database.json"
+            
+            print(f"Downloading amiibo database from amiiboapi.org...")
+            url = "https://amiiboapi.org/api/amiibo/"
+            response = requests.get(url, timeout=30)
+            
+            if response.status_code != 200:
+                status_var.set("Download failed")
+                messagebox.showerror("Database Download", f"API error: {response.status_code}")
+                return
+            
+            data = response.json()
+            amiibo_list = data.get("amiibo", [])
+            
+            if not amiibo_list:
+                status_var.set("Download failed")
+                messagebox.showerror("Database Download", "No amiibo data received")
+                return
+            
+            # Save to file
+            with open(db_path, 'w', encoding='utf-8') as f:
+                import json
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            status_var.set(f"✓ Downloaded {len(amiibo_list)} amiibo entries")
+            messagebox.showinfo("Database Download", f"Successfully downloaded {len(amiibo_list)} amiibo entries\nSaved to: {db_path}")
+            update_db_status()
+        
+        except Exception as e:
+            status_var.set("Download failed")
+            messagebox.showerror("Database Download", f"Error: {e}")
+    
+    db_status_var = tk.StringVar()
+    db_status_label = ttk.Label(db_status_frame, textvariable=db_status_var, anchor="w")
+    db_status_label.pack(anchor="w", pady=(0, 4))
+    
+    db_button_frame = ttk.Frame(decode_tab)
+    db_button_frame.pack(fill=tk.X, padx=10, pady=(0, 8))
+    ttk.Button(db_button_frame, text="Download Amiibo Database", command=download_database_gui).pack(anchor="w")
+    
+    # Initial status check
+    update_db_status()
+
+    # Options frame for decode
+    options_frame = ttk.Frame(decode_tab)
+    options_frame.pack(fill=tk.X, padx=10, pady=(0, 8))
+
+    pro_names_var = tk.BooleanVar(value=False)
+    ttk.Checkbutton(options_frame, text="Pro file names (no extensions)", variable=pro_names_var).pack(anchor="w")
+
+    def decode_from_gui():
+        input_file = decode_input_var.get().strip()
+        output_dir = decode_output_var.get().strip()
+        pro_names = pro_names_var.get()
+
+        if not input_file:
+            messagebox.showerror("Decode", "Please choose an input FCA file.")
+            return
+        if not output_dir:
+            messagebox.showerror("Decode", "Please choose an output directory.")
+            return
+
+        try:
+            decode_fca(input_file, output_dir, use_pro_names=pro_names)
+            status_var.set(f"Extracted files to: {output_dir}")
+            messagebox.showinfo("Decode", f"Archive extracted successfully:\n{output_dir}")
+        except Exception as e:
+            status_var.set("Decode failed")
+            messagebox.showerror("Decode", f"Error: {e}")
+
+    ttk.Button(decode_tab, text="Extract FCA archive", command=decode_from_gui).pack(anchor="e", padx=10, pady=(0, 10))
+
+    status_bar = ttk.Label(root, textvariable=status_var, anchor="w")
+    status_bar.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+    root.mainloop()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Unified FCA encoder/decoder tool (CLI + GUI)")
+    parser.add_argument("--gui", action="store_true", help="Launch GUI mode")
+
+    subparsers = parser.add_subparsers(dest="command")
+
+    encode_parser = subparsers.add_parser("encode", help="Create FCA archive from input files")
+    encode_parser.add_argument(
+        "--output-file",
+        required=True,
+        metavar="<file>",
+        help="Output FCA file path",
+    )
+    encode_input_group = encode_parser.add_mutually_exclusive_group(required=True)
+    encode_input_group.add_argument(
+        "--input-files",
+        nargs="+",
+        metavar="<file>",
+        help="Input file(s) to include in the archive (mutually exclusive with --input-dirs)",
+    )
+    encode_input_group.add_argument(
+        "--input-dirs",
+        nargs="+",
+        metavar="<dir>",
+        help="Input directory(ies) to search recursively for files (mutually exclusive with --input-files)",
+    )
+
+    decode_parser = subparsers.add_parser("decode", help="Extract files from FCA archive")
+    decode_parser.add_argument(
+        "--input-file",
+        required=True,
+        metavar="<file>",
+        help="Input FCA file path",
+    )
+    decode_parser.add_argument(
+        "--output-dir",
+        required=True,
+        metavar="<dir>",
+        help="Output directory for extracted files",
+    )
+    decode_parser.add_argument(
+        "--pro-names",
+        action="store_true",
+        help="Use Pro file names (no extensions) for amiibo files",
+    )
+    decode_parser.add_argument(
+        "--database",
+        metavar="<file>",
+        help="Path to custom amiibo database JSON file",
+    )
+
+    download_parser = subparsers.add_parser("download-database", help="Download amiibo database from amiiboapi.org")
+    download_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-download even if database already exists",
+    )
+
+    args = parser.parse_args()
+
+    if args.gui or args.command is None:
+        run_gui()
+        return
+
+    try:
+        if args.command == "encode":
+            encode_fca_from_sources(
+                output_file=args.output_file,
+                input_files=args.input_files,
+                input_dirs=args.input_dirs,
+            )
+        elif args.command == "decode":
+            decode_fca(args.input_file, args.output_dir, use_pro_names=args.pro_names, database_file=args.database if hasattr(args, 'database') else None)
+        elif args.command == "download-database":
+            from fca_decode import download_amiibo_database_to_script_dir
+            success = download_amiibo_database_to_script_dir(force=args.force if hasattr(args, 'force') else False)
+            if not success:
+                os.sys.exit(1)
+        else:
+            parser.print_help()
+            os.sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}", file=os.sys.stderr)
+        os.sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
