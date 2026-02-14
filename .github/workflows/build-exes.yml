@@ -16,8 +16,37 @@ on:
         default: false
 
 jobs:
+  test:
+    name: Test (unittest + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        working-directory: python
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run unit tests
+        working-directory: python
+        run: python -m unittest discover -s tests -v
+
+      - name: Run pytest
+        working-directory: python
+        run: pytest tests/ -v
+
   build-windows-x64:
     name: Build (windows-x64)
+    needs: test
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -67,6 +96,7 @@ jobs:
 
   build-windows-arm64:
     name: Build (windows-arm64)
+    needs: test
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_arm64 == true }}
     runs-on: [self-hosted, Windows, ARM64]
     timeout-minutes: 30
@@ -135,10 +165,9 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: |
-            dist/windows-x64/fca-encode.exe
-            dist/windows-x64/fca-decode.exe
-            dist/windows-x64/fca-tool.exe
+          files: dist/windows-x64/*.exe
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          allow_updates: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
