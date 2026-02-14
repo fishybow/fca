@@ -83,10 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fca-exes-windows-x64
-          path: |
-            dist/windows-x64/fca-encode.exe
-            dist/windows-x64/fca-decode.exe
-            dist/windows-x64/fca-tool.exe
+          path: dist/windows-x64
           if-no-files-found: error
 
   release:
@@ -108,9 +105,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: dist/windows-x64/*.exe
+          files: dist/windows-x64/*
           generate_release_notes: true
-          fail_on_unmatched_files: true
           allow_updates: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
