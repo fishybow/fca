@@ -81,6 +81,11 @@ jobs:
           Write-Host "Built files:"
           Get-ChildItem ../dist/windows-x64 -File | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
 
+      - name: Verify icon resources in built EXEs
+        working-directory: python
+        run: |
+          python check_exe_icons.py ../dist/windows-x64/fca-encode.exe ../dist/windows-x64/fca-decode.exe ../dist/windows-x64/fca-tool.exe | Tee-Object -FilePath icon-check-x64.log
+
       - name: Upload debug logs (x64)
         uses: actions/upload-artifact@v4
         with:
@@ -88,6 +93,7 @@ jobs:
           path: |
             python/.build-icon.ico
             python/pyinstaller-*.log
+            python/icon-check-x64.log
             python/*.spec
             python/build/**/warn-*.txt
           if-no-files-found: warn
@@ -170,6 +176,11 @@ jobs:
           Write-Host "Built files:"
           Get-ChildItem ../dist/windows-arm64 -File | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
 
+      - name: Verify icon resources in built EXEs
+        working-directory: python
+        run: |
+          python check_exe_icons.py ../dist/windows-arm64/fca-encode.exe ../dist/windows-arm64/fca-decode.exe ../dist/windows-arm64/fca-tool.exe | Tee-Object -FilePath icon-check-arm64.log
+
       - name: Upload debug logs (arm64)
         uses: actions/upload-artifact@v4
         with:
@@ -177,6 +188,7 @@ jobs:
           path: |
             python/.build-icon.ico
             python/pyinstaller-*.log
+            python/icon-check-arm64.log
             python/*.spec
             python/build/**/warn-*.txt
           if-no-files-found: warn
