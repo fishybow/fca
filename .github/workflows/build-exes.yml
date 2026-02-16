@@ -102,8 +102,11 @@ jobs:
       - name: Remove existing rolling assets
         shell: bash
         run: |
-          gh release view rolling --json assets -q '.assets[].name' \
-            | xargs -r -I {} gh release delete-asset rolling "{}" -y
+          if gh release view rolling --json assets -q '.assets[].name' > /tmp/rolling_assets.txt; then
+            cat /tmp/rolling_assets.txt | xargs -r -I {} gh release delete-asset rolling "{}" -y
+          else
+            echo "Rolling release not found yet; skipping asset cleanup."
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
