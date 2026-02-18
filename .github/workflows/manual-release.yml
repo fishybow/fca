@@ -1,11 +1,25 @@
-name: Build Windows EXEs
+name: Manual Release
 
 on:
-  push:
-    branches:
-      - develop
-  pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g., v1.2.3)"
+        required: true
+        type: string
+      release_name:
+        description: "Release title"
+        required: true
+        type: string
+      release_notes:
+        description: "Release notes (optional; leave blank to auto-generate)"
+        required: false
+        type: string
+      prerelease:
+        description: "Mark this release as a prerelease"
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -16,6 +30,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -46,6 +62,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -85,8 +103,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish Rolling Release
-    if: github.ref == 'refs/heads/develop'
+    name: Publish Release
     needs: build-windows-x64
     runs-on: ubuntu-latest
     permissions:
@@ -99,33 +116,20 @@ jobs:
           name: fca-exes-windows-x64
           path: dist/windows-x64
 
-      - name: Remove existing rolling assets
-        shell: bash
-        run: |
-          if gh release view rolling --json assets -q '.assets[].name' > /tmp/rolling_assets.txt; then
-            cat /tmp/rolling_assets.txt | xargs -r -I {} gh release delete-asset rolling "{}" -y
-          else
-            echo "Rolling release not found yet; skipping asset cleanup."
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
-      - name: Create or update rolling release and upload assets
+      - name: Create release and upload assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: rolling
-          name: Rolling Release
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_name }}
           target_commitish: ${{ github.sha }}
-          body: |
-            Build from ${{ github.sha }}
-
-            ${{ github.event.head_commit.message }}
+          body: ${{ inputs.release_notes }}
+          generate_release_notes: ${{ inputs.release_notes == '' }}
           files: dist/windows-x64/*
-          generate_release_notes: false
           overwrite_files: true
-          prerelease: true
           make_latest: true
+          prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: true
+          # Placeholder for custom changelog input:
+          # append_body: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
