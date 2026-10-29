@@ -7,6 +7,8 @@ Usage:
 """
 
 import argparse
+import json
+import re
 import struct
 import os
 from pathlib import Path
@@ -62,7 +64,53 @@ def detect_file_type(content):
     
     return FILE_TYPE_UNKNOWN
 
-def encode_fca(input_dirs, output_file, exclude_pattern=None):
+def _load_release_year_filter(release_year, amiibo_json=None):
+    """Return (set of 0x-prefixed 16-hex amiibo IDs, set of 16-bit NIDs) for a release year."""
+    year_prefix = f"{release_year}-"
+    amiibo_ids = set()
+    nids = set()
+
+    # 1. Check amiibo.json / amiibo_database.json
+    json_candidates = []
+    if amiibo_json:
+        json_candidates.append(Path(amiibo_json))
+    script_dir = Path(__file__).resolve().parent
+    json_candidates.extend([
+        Path.cwd() / "../../website/downloads/amiibo.json",
+        script_dir.parent.parent / "website/downloads/amiibo.json",
+        script_dir / "amiibo_database.json",
+    ])
+    for jp in json_candidates:
+        if jp.is_file():
+            try:
+                data = json.loads(jp.read_text(encoding="utf-8"))
+                for aid, info in data.get("amiibos", {}).items():
+                    rel = info.get("release") or ""
+                    if isinstance(rel, str) and rel.startswith(year_prefix):
+                        amiibo_ids.add(aid.lower())
+                    elif isinstance(rel, dict):
+                        if any((v or "").startswith(year_prefix) for v in rel.values()):
+                            amiibo_ids.add(aid.lower())
+            except Exception:
+                pass
+            break
+
+    # 2. Also check ../fw/application/src/app/catalog/catalog_data.c if present
+    cat_path = Path.cwd() / "../fw/application/src/app/catalog/catalog_data.c"
+    if cat_path.is_file():
+        try:
+            cat_text = cat_path.read_text(encoding="utf-8")
+            m = re.search(rf"s_year_{release_year}_nids\[\]\s*=\s*\{{([^}}]+)\}}", cat_text)
+            if m:
+                for hex_nid in re.findall(r"YEAR_ITEM\(\s*\d+\s*,\s*(0x[0-9a-fA-F]+)\s*\)", m.group(1)):
+                    nids.add(int(hex_nid, 16))
+        except Exception:
+            pass
+
+    return amiibo_ids, nids
+
+
+def encode_fca(input_dirs, output_file, exclude_pattern=None, release_year=None, amiibo_json=None):
     """
     Recursively concatenate all files from input_dirs into an FCA archive.
     
@@ -70,11 +118,17 @@ def encode_fca(input_dirs, output_file, exclude_pattern=None):
         input_dirs: Paths to input directories
         output_file: Path to output FCA file
         exclude_pattern: If set, any file whose relative path contains this string is excluded
+        release_year: If set, only include Amiibo files released in this year
+        amiibo_json: Optional path to amiibo.json when filtering by release_year
     """
     output_path = Path(output_file)
     
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    year_ids, year_nids = (None, None)
+    if release_year is not None:
+        year_ids, year_nids = _load_release_year_filter(release_year, amiibo_json=amiibo_json)
     
     # Collect all files recursively from each input dir (skip hidden files and directories)
     files = []
@@ -95,6 +149,14 @@ def encode_fca(input_dirs, output_file, exclude_pattern=None):
                     except ValueError:
                         rel = file_path
                     if exclude_pattern in str(rel):
+                        continue
+                if release_year is not None:
+                    content = file_path.read_bytes()
+                    if len(content) < 0x5C:
+                        continue
+                    aid = "0x" + content[0x54:0x5C].hex().lower()
+                    nid = struct.unpack(">H", content[0x58:0x5A])[0]
+                    if aid not in year_ids and nid not in year_nids:
                         continue
                 files.append(file_path)
     
@@ -163,11 +225,30 @@ def main():
         metavar='<string>',
         help='Exclude any file whose relative path contains this string'
     )
+    parser.add_argument(
+        '--release-year',
+        default=None,
+        type=int,
+        metavar='<year>',
+        help='Only include Amiibo files released in the specified year (e.g. 2026)'
+    )
+    parser.add_argument(
+        '--amiibo-json',
+        default=None,
+        metavar='<file>',
+        help='Optional path to amiibo.json for --release-year filtering'
+    )
     
     args = parser.parse_args()
     
     try:
-        encode_fca(args.input_dirs, args.output_file, exclude_pattern=args.exclude_pattern)
+        encode_fca(
+            args.input_dirs,
+            args.output_file,
+            exclude_pattern=args.exclude_pattern,
+            release_year=args.release_year,
+            amiibo_json=args.amiibo_json,
+        )
     except Exception as e:
         print(f"Error: {e}", file=os.sys.stderr)
         os.sys.exit(1)
